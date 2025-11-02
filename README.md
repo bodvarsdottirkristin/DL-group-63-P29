@@ -4,5 +4,7 @@ Repo for the Increasing Maritime Domain Awareness using spatio-temporal sequenti
 
 # create env
 python -m venv .venv && source .venv/bin/activate
+
 pip install -r requirements.txt
+
 pre-commit install
