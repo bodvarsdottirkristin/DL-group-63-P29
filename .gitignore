@@ -1,2 +1,29 @@
-.venv/
 .history/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+
+# Envs & tools
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Data & artifacts
+data/raw/
+data/interim/
+data/processed/
+outputs/
+logs/
+checkpoints/
+*.pt
+*.pth
+*.parquet
+
+# Editors/OS
+.DS_Store
+

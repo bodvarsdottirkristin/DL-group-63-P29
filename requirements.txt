@@ -1,7 +1,9 @@
 numpy
 scipy
+scikit-learn
 matplotlib
 pandas
+pyarrow
 tensorboard
 sklearn
 
@@ -9,3 +11,4 @@ torch
 torchvision
 torchaudio
 torchsummary
+
