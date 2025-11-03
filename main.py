@@ -74,5 +74,24 @@ def fn(file_path, out_path):
     )
 
 
+def fn_get_dk_ports(file_path, out_path):
+    dtypes = {
+        "Harbor": str,
+        "Code": str,
+        "Location": "object"
+    }
+
+    df = pandas.read_csv(file_path)
+
+    df.columns=['harbor', 'code', 'location']
+
+    print(df.describe())
+
+
+
 if __name__ == "__main__":
-    fn('http://aisdata.ais.dk/', 'ais_data')
+    fn_get_dk_ports('data/raw/port_locodes.csv', 'data/processed/dk_port_locodes.csv')
+    
+    # fn('data/raw/aisdk-2025-02-26.csv', 'data/processed/aisdk-2025-02-26.csv')
+
+
