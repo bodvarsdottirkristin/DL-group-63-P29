@@ -81,16 +81,14 @@ def fn_get_dk_ports(file_path, out_path):
         "Location": "object"
     }
 
-    df = pandas.read_csv(file_path)
+    df = pandas.read_csv(file_path, sep=";")
 
     df.columns=['harbor', 'code', 'location']
 
-    print(df.describe())
-
-
+    df = df[df['code'].str[0:2] == "DK"]
 
 if __name__ == "__main__":
-    fn_get_dk_ports('data/raw/port_locodes.csv', 'data/processed/dk_port_locodes.csv')
+    fn_get_dk_ports('data/port_locodes/raw/port_locodes.csv', 'data/port_locodes/processed/dk_port_locodes.csv')
     
     # fn('data/raw/aisdk-2025-02-26.csv', 'data/processed/aisdk-2025-02-26.csv')
 
