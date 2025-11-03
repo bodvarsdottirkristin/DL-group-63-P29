@@ -14,7 +14,8 @@ __pycache__/
 *.egg-info/
 
 # Data & artifacts
-data/raw/
+data/aisdk/
+data/port_locodes/processed
 data/interim/
 data/processed/
 outputs/
