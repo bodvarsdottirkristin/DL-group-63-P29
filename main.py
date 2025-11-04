@@ -1,4 +1,4 @@
-import pandas
+import pandas as pd
 import pyarrow
 import pyarrow.parquet
 from sklearn.cluster import KMeans
@@ -15,7 +15,7 @@ def fn(file_path, out_path):
         "Type of mobile": "object",
     }
     usecols = list(dtypes.keys())
-    df = pandas.read_csv(file_path, usecols=usecols, dtype=dtypes)
+    df = pd.read_csv(file_path, usecols=usecols, dtype=dtypes)
 
     # Remove errors
     bbox = [60, 0, 50, 20]
@@ -28,7 +28,7 @@ def fn(file_path, out_path):
     df = df[df["MMSI"].str[:3].astype(int).between(200, 775)]  # Adhere to MID standard
 
     df = df.rename(columns={"# Timestamp": "Timestamp"})
-    df["Timestamp"] = pandas.to_datetime(df["Timestamp"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
 
     df = df.drop_duplicates(["Timestamp", "MMSI", ], keep="first")
 
@@ -81,11 +81,15 @@ def fn_get_dk_ports(file_path, out_path):
         "Location": "object"
     }
 
-    df = pandas.read_csv(file_path, sep=";")
+    df = pd.read_csv(file_path, sep=";")
 
     df.columns=['harbor', 'code', 'location']
 
     df = df[df['code'].str[0:2] == "DK"]
+
+    df.to_csv(out_path, index=False)
+    
+    print('finished creating csv')
 
 if __name__ == "__main__":
     fn_get_dk_ports('data/port_locodes/raw/port_locodes.csv', 'data/port_locodes/processed/dk_port_locodes.csv')
