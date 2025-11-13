@@ -3,12 +3,47 @@ import pyarrow
 import pyarrow.parquet
 from sklearn.cluster import KMeans
 
+
+
+def resample_segment(g):
+
+    # 1) Ensure Timestamp is datetime and sorted
+    g["Timestamp"] = pd.to_datetime(g["Timestamp"])
+    g = g.sort_values("Timestamp").set_index("Timestamp")
+
+    # 2) Remember static/categorical info for this segment
+    static_cols = ["MMSI", "Ship type", "is_cargo", "Segment"]
+    static_vals = {}
+    for col in static_cols:
+        if col in g.columns:
+            static_vals[col] = g[col].iloc[0]
+
+    # 3) Select numeric columns and resample to 1-minute bins
+    numeric_cols = g.select_dtypes(include="number").columns
+    g_num = g[numeric_cols].resample("1T").mean()
+
+    # 4) Interpolate over time for numeric data
+    g_num = g_num.interpolate(method="time")
+
+    # 5) Rebuild DataFrame, re-attach static columns
+    g_res = g_num.reset_index()  # bring Timestamp back as column
+    for col, val in static_vals.items():
+        g_res[col] = val
+
+    # TODO: More research on how to interpolate the data!!
+
+    return g_res
+
+
 def fn(file_path, out_path):
     '''
     in: filepath as str
     out: filepath as str
 
     '''
+    import shutil, os
+    if os.path.exists(out_path):
+        shutil.rmtree(out_path)
 
     dtypes = {
         "MMSI": "object",
@@ -72,6 +107,9 @@ def fn(file_path, out_path):
     # "Longitude": center[1],
 
     # df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
+
+
+
     # Save as parquet file with partitions
     table = pyarrow.Table.from_pandas(df, preserve_index=False)
     pyarrow.parquet.write_to_dataset(
@@ -84,9 +122,7 @@ def fn(file_path, out_path):
 
     df.iloc[:1000].to_csv('data/aisdk/processed/processed_ais_data_to_look_at.csv')
 
-
     print(df['Ship type'].unique())
-
 
 
 def fn_get_dk_ports(file_path, out_path):
