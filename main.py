@@ -2,7 +2,10 @@ import pandas as pd
 import pyarrow
 import pyarrow.parquet
 from sklearn.cluster import KMeans
+from src.visualize import save_all_trajectory_plots_simple
+from src.inspect import inspect_one_segment
 
+RAW_FILES = [f"data/aisdk/raw/aisdk-2025-08-01.csv"] #1 day for running on CPU
 
 def fn(file_path, out_path):
     dtypes = {
@@ -13,6 +16,7 @@ def fn(file_path, out_path):
         "Latitude": float,
         "# Timestamp": "object",
         "Type of mobile": "object",
+        "Ship type": "object",
     }
     usecols = list(dtypes.keys())
     df = pd.read_csv(file_path, usecols=usecols, dtype=dtypes)
@@ -24,6 +28,9 @@ def fn(file_path, out_path):
             df["Longitude"] <= east)]
 
     df = df[df["Type of mobile"].isin(["Class A", "Class B"])].drop(columns=["Type of mobile"])
+
+    # We only want Cargo ships
+    df = df[df["Ship type"].isin(["Cargo"])]
     df = df[df["MMSI"].str.len() == 9]  # Adhere to MMSI format
     df = df[df["MMSI"].str[:3].astype(int).between(200, 775)]  # Adhere to MID standard
 
@@ -50,19 +57,28 @@ def fn(file_path, out_path):
     df = df.groupby(["MMSI", "Segment"]).filter(track_filter)
     df = df.reset_index(drop=True)
 
-    #
     knots_to_ms = 0.514444
     df["SOG"] = knots_to_ms * df["SOG"]
 
     # Clustering
-    # kmeans = KMeans(n_clusters=48, random_state=0)
-    # kmeans.fit(df[["Latitude", "Longitude"]])
-    # df["Geocell"] = kmeans.labels_
-    # centers = kmeans.cluster_centers_
-    # "Latitude": center[0],
-    # "Longitude": center[1],
+    # --------
+    kmeans = KMeans(n_clusters=48, random_state=0)
+    kmeans.fit(df[["Latitude", "Longitude"]])
 
-    # df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
+    df["Geocell"] = kmeans.labels_
+
+    centers= kmeans.cluster_centers_
+    geocell_centers = pd.DataFrame(
+    centers,
+    columns=["Center_Latitude", "Center_Longitude"],
+    )
+
+    geocell_centers["Geocell"] = geocell_centers.index
+
+    print(geocell_centers.head())
+    # --------
+
+    df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
     # Save as parquet file with partitions
     table = pyarrow.Table.from_pandas(df, preserve_index=False)
     pyarrow.parquet.write_to_dataset(
@@ -92,8 +108,14 @@ def fn_get_dk_ports(file_path, out_path):
     print('finished creating csv')
 
 if __name__ == "__main__":
-    fn_get_dk_ports('data/port_locodes/raw/port_locodes.csv', 'data/port_locodes/processed/dk_port_locodes.csv')
+    # Don't need to run this again
+    # fn_get_dk_ports('data/port_locodes/raw/port_locodes.csv', 'data/port_locodes/processed/dk_port_locodes.csv')
     
-    # fn('data/raw/aisdk-2025-02-26.csv', 'data/processed/aisdk-2025-02-26.csv')
+    for f in RAW_FILES:
+        fn(f, 'data/aisdk/processed')
+    
+    save_all_trajectory_plots_simple()
+
+    inspect_one_segment()
 
 

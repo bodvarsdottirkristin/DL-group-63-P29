@@ -15,7 +15,6 @@ __pycache__/
 
 # Data & artifacts
 data/aisdk/
-data/port_locodes/processed
 data/interim/
 data/processed/
 outputs/
@@ -27,4 +26,8 @@ checkpoints/
 
 # Editors/OS
 .DS_Store
+
+
+# Plots
+plots/
 
