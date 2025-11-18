@@ -99,6 +99,19 @@ class VRAE(nn.Module):
             latent_dim=latent_dim,
             num_layers=num_layers)
 
+    def encode_mu(self, x, lengths=None):
+        """
+        x: (batch, seq_len, input_dim)
+        lengths: optional sequence lengths
+
+        Returns:
+            mu: (batch, latent_dim) – deterministic latent embedding
+        """
+        self.eval()
+        with torch.no_grad():
+            _, mu, _ = self.encoder(x, lengths)
+        return mu
+    
     def forward(self, x):
         """
         x: (batch, seq_len, input_size)
@@ -113,7 +126,6 @@ class VRAE(nn.Module):
             "mu": mu,
             "logvar": logvar,
         }
-
 
     @staticmethod
     def loss_function(x, x_hat, mu, logvar, beta=1.0):
