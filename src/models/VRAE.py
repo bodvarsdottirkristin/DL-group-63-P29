@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class RNNEncoder(nn.Module):
     def __init__(self, input_size, hidden_size, latent_dim, num_layers=1, bidirectional=False):
-        super(RNNEncoder).__init__()
+        super(RNNEncoder, self).__init__()
         
         self.gru = nn.GRU(
             input_size=input_size,
@@ -89,11 +89,13 @@ class RNNDecoder(nn.Module):
 class VRAE(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim, num_layers=1, bidirectional=False):
         super(VRAE, self).__init__()
+
         self.encoder = RNNEncoder(input_size=input_dim,
             hidden_size=hidden_dim,
             latent_dim=latent_dim,
             num_layers=num_layers,
             bidirectional=bidirectional)
+        
         self.decoder = RNNDecoder(input_size=input_dim,
             hidden_size=hidden_dim,
             latent_dim=latent_dim,
