@@ -5,37 +5,9 @@ from sklearn.cluster import KMeans
 
 
 
-def resample_segment(g):
-
-    # 1) Ensure Timestamp is datetime and sorted
-    g["Timestamp"] = pd.to_datetime(g["Timestamp"])
-    g = g.sort_values("Timestamp").set_index("Timestamp")
-
-    # 2) Remember static/categorical info for this segment
-    static_cols = ["MMSI", "Ship type", "is_cargo", "Segment"]
-    static_vals = {}
-    for col in static_cols:
-        if col in g.columns:
-            static_vals[col] = g[col].iloc[0]
-
-    # 3) Select numeric columns and resample to 1-minute bins
-    numeric_cols = g.select_dtypes(include="number").columns
-    g_num = g[numeric_cols].resample("1T").mean()
-
-    # 4) Interpolate over time for numeric data
-    g_num = g_num.interpolate(method="time")
-
-    # 5) Rebuild DataFrame, re-attach static columns
-    g_res = g_num.reset_index()  # bring Timestamp back as column
-    for col, val in static_vals.items():
-        g_res[col] = val
-
-    # TODO: More research on how to interpolate the data!!
-
-    return g_res
 
 
-def fn(file_path, out_path):
+def fn(file_path="data/aisdk/raw/aisdk-2025-08-29.csv", out_path="data/aisdk/interim/initial_clean"):
     '''
     in: filepath as str
     out: filepath as str
@@ -60,6 +32,7 @@ def fn(file_path, out_path):
 
     df["Ship type"] = df["Ship type"].astype("string").str.strip()
     df = df[df["Ship type"] == "Cargo"]
+    df = df.drop(columns="Ship type")
 
     # Remove errors
     bbox = [60, 0, 50, 20]
@@ -108,8 +81,6 @@ def fn(file_path, out_path):
 
     # df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 
-
-
     # Save as parquet file with partitions
     table = pyarrow.Table.from_pandas(df, preserve_index=False)
     pyarrow.parquet.write_to_dataset(
@@ -119,10 +90,6 @@ def fn(file_path, out_path):
                         "Segment",  # "Geocell"
                         ]
     )
-
-    df.iloc[:1000].to_csv('data/aisdk/processed/processed_ais_data_to_look_at.csv')
-
-    print(df['Ship type'].unique())
 
 
 def fn_get_dk_ports(file_path, out_path):
