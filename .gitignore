@@ -15,6 +15,7 @@ __pycache__/
 
 # Data & artifacts
 data/aisdk/
+data/ais_data/
 data/interim/
 data/processed/
 outputs/
