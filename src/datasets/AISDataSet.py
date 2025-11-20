@@ -1,9 +1,8 @@
 import torch
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.data import random_split
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class AISDataloader(Dataset):
+class AISDataSet(Dataset):
 
   def __init__(self, trajectories: torch.Tensor):
     """
@@ -20,8 +19,12 @@ class AISDataloader(Dataset):
     return self.trajectories[idx]
 
   
-def get_dataloaders(trajectories, batch_size=4, num_workers=2, seed=0):
-    """Create train, validation, and test dataloaders with 60/20/20 split"""
+def get_dataloaders(trajectories, batch_size=4, num_workers=2, seed=0, return_stats=True):
+    """Create train, validation, and test dataloaders with 60/20/20 split
+
+    Normalization is FIT on TRAIN ONLY, then applied to all splits.
+    Optionally returns mean/std so results can be interpreted in original units.
+    """
 
     # (N, T, D)
     trajectories_tensor = torch.as_tensor(trajectories, dtype=torch.float32)
@@ -31,11 +34,11 @@ def get_dataloaders(trajectories, batch_size=4, num_workers=2, seed=0):
     val_size = int(0.2 * total_size)
     test_size = total_size - train_size - val_size
 
-    # ---- first: random split on UNNORMALIZED data to get indices ----
+    # random split on unnormalized data to get indices
     generator = torch.Generator().manual_seed(seed)
 
     # temporary dataset just to be able to call random_split
-    base_dataset = AISDataloader(trajectories_tensor)
+    base_dataset = AISDataSet(trajectories_tensor)
 
     train_dataset, val_dataset, test_dataset = random_split(
         base_dataset, [train_size, val_size, test_size], generator=generator
@@ -46,22 +49,25 @@ def get_dataloaders(trajectories, batch_size=4, num_workers=2, seed=0):
     val_indices = val_dataset.indices
     test_indices = test_dataset.indices
 
-    # Normalize
+    # compute mean/std on train 
     train_trajectories_tensor = trajectories_tensor[train_indices]  # (N_train, T, D)
+
     mean = train_trajectories_tensor.mean(dim=(0, 1), keepdim=True)  # (1, 1, D)
     std = train_trajectories_tensor.std(dim=(0, 1), keepdim=True)
     std = std.clamp_min(1e-8)  # avoid division by zero
 
+    # normalize ALL data using train stats
     x_norm = (trajectories_tensor - mean) / std
 
-    dataset = AISDataloader(x_norm)
+    # rebuild dataset on normalized data
+    dataset = AISDataSet(x_norm)
 
     # and re-create the subsets using the same indices
     train_dataset = Subset(dataset, train_indices)
     val_dataset   = Subset(dataset, val_indices)
     test_dataset  = Subset(dataset, test_indices)
 
-    # ---- dataloaders ----
+    # dataloaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -84,7 +90,4 @@ def get_dataloaders(trajectories, batch_size=4, num_workers=2, seed=0):
         pin_memory=True,
     )
 
-    return train_loader, val_loader, test_loader
-
-
-
+    return train_loader, val_loader, test_loader, mean, std
