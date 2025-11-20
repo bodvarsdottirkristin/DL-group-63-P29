@@ -1,10 +1,15 @@
 """
-Trajectory Segmentation for Ship AIS Data
+Trajectory Segmentation for Ship AIS Data (Optimized)
 
 Segments continuous ship tracking data into distinct voyages/trajectories.
 Trajectories are split when ships stop moving for extended periods.
 
 No movement = (SOG < 1 knot) OR (position variance < 50m) for > 30 min
+
+Optimizations:
+- Early SOG checking to avoid expensive distance calculations
+- Pre-computed time differences
+- Fixed trajectory assignment bug
 """
 
 import numpy as np
@@ -18,7 +23,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     """
     R = 6371000  # Earth radius in meters
     
-    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    lat1, lon1, lat2, lon2 = np.radians(lat1), np.radians(lon1), np.radians(lat2), np.radians(lon2)
     
     dlat = lat2 - lat1
     dlon = lon2 - lon1
@@ -32,6 +37,7 @@ def calculate_position_variance(latitudes, longitudes):
     """
     Calculate maximum distance from center point (position variance).
     Returns the radius of the smallest circle containing all points.
+    Vectorized for speed.
     """
     if len(latitudes) < 2:
         return 0.0
@@ -39,114 +45,175 @@ def calculate_position_variance(latitudes, longitudes):
     center_lat = latitudes.mean()
     center_lon = longitudes.mean()
     
-    max_distance = 0.0
-    for lat, lon in zip(latitudes, longitudes):
-        dist = haversine_distance(center_lat, center_lon, lat, lon)
-        max_distance = max(max_distance, dist)
+    # Vectorized haversine
+    R = 6371000
+    lat1, lon1 = np.radians(center_lat), np.radians(center_lon)
+    lat2, lon2 = np.radians(latitudes), np.radians(longitudes)
     
-    return max_distance
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    distances = R * c
+    
+    return distances.max()
 
 
 def segment_trajectories(df, 
                          sog_threshold=0.514,  # 1 knot in m/s
                          position_threshold=50,  # 50 meters
                          time_threshold=30,  # 30 minutes
+                         time_gap_threshold=30,  # 30 minutes - split on large gaps (transponder issues)
                          min_segment_distance=1000,  # 1 km
                          min_points=10):
     """
-    Segment ship AIS data into trajectories, splitting when ships stop moving.
-    No movement = (SOG < 1 knot) OR (position variance < 50m) for > 30 min
+    Segment ship AIS data into trajectories, splitting when:
+    1. Ships stop moving: (SOG < 1 knot) OR (position variance < 50m) for > 30 min
+    2. Large time gaps (>30 min) between consecutive points (transponder issues)
+    
+    Optimized with vectorized operations and efficient detection.
     """
     
     df = df.sort_values(['MMSI', 'Timestamp']).reset_index(drop=True).copy()
-    df['Trajectory'] = -1
+    trajectories = np.full(len(df), -1, dtype=np.int32)
     current_traj_id = 0
+
+    count = 0
     
     for mmsi in df['MMSI'].unique():
-        ship_indices = df[df['MMSI'] == mmsi].index.tolist()
-        df.loc[ship_indices[0], 'Trajectory'] = current_traj_id
+        mask = df['MMSI'] == mmsi
+        ship_indices = np.where(mask)[0]
+
+        count += 1
+        print(f"Processing ship {count}")
+        
+        # Extract arrays once for this ship
+        ship_lats = df.loc[mask, 'Latitude'].values
+        ship_lons = df.loc[mask, 'Longitude'].values
+        ship_sogs = df.loc[mask, 'SOG'].values
+        ship_times = df.loc[mask, 'Timestamp'].values
+        
+        # Pre-compute time differences in minutes (vectorized)
+        ship_times_minutes = (ship_times - ship_times[0]) / np.timedelta64(1, 'm')
+        time_gaps = np.diff(ship_times_minutes)  # gaps between consecutive points
+        
+        # Pre-identify time gap splits (vectorized) - where gaps exceed threshold
+        gap_splits = np.where(time_gaps >= time_gap_threshold)[0] + 1  # +1 because diff reduces size by 1
+        
+        # Pre-identify low-speed points for faster checks
+        low_speed_mask = ship_sogs < sog_threshold
+        
+        trajectories[ship_indices[0]] = current_traj_id
         
         i = 1
-        while i < len(ship_indices):
-            curr_idx = ship_indices[i]
+        n = len(ship_indices)
+        gap_split_set = set(gap_splits)  # Convert to set for O(1) lookup
+        
+        while i < n:
+            # Check for large time gap first (cheap O(1) operation)
+            if i in gap_split_set:
+                # Large time gap detected - start new trajectory
+                current_traj_id += 1
+                trajectories[ship_indices[i]] = current_traj_id
+                i += 1
+                continue
             
-            # Build buffer to check for stationary period
-            stationary_buffer = [curr_idx]
-            j = i + 1
+            # Assign current point to trajectory by default
+            if trajectories[ship_indices[i]] == -1:
+                trajectories[ship_indices[i]] = current_traj_id
             
-            while j < len(ship_indices):
-                stationary_buffer.append(ship_indices[j])
-                
-                # Check duration
-                start_time = df.loc[stationary_buffer[0], 'Timestamp']
-                end_time = df.loc[stationary_buffer[-1], 'Timestamp']
-                duration = (end_time - start_time).total_seconds() / 60
-                
-                if duration >= time_threshold:
-                    # Check: (SOG < threshold) OR (position variance < threshold)
-                    lats = df.loc[stationary_buffer, 'Latitude'].values
-                    lons = df.loc[stationary_buffer, 'Longitude'].values
-                    sogs = df.loc[stationary_buffer, 'SOG'].values
-                    
-                    low_speed = (sogs < sog_threshold).all()
-                    pos_variance = calculate_position_variance(lats, lons)
-                    
-                    if low_speed or pos_variance < position_threshold:
-                        # Stationary period confirmed - skip through it
-                        # Continue adding points until stationary period ends
-                        while j < len(ship_indices):
-                            test_idx = ship_indices[j]
-                            test_buffer = stationary_buffer + [test_idx]
-                            
-                            lats = df.loc[test_buffer, 'Latitude'].values
-                            lons = df.loc[test_buffer, 'Longitude'].values
-                            sogs = df.loc[test_buffer, 'SOG'].values
-                            
-                            low_speed = (sogs < sog_threshold).all()
-                            pos_variance = calculate_position_variance(lats, lons)
-                            
-                            if low_speed or pos_variance < position_threshold:
-                                # Still stationary
-                                stationary_buffer.append(test_idx)
-                                j += 1
-                            else:
-                                # Stationary period ended
-                                break
-                        
-                        # Mark all stationary points for exclusion
-                        df.loc[stationary_buffer, 'Trajectory'] = -2
-                        current_traj_id += 1
-                        i = j
-                        break
-                    else:
-                        # Not stationary, keep checking
-                        j += 1
-                else:
-                    # Duration not long enough yet
+            # Use binary search to find furthest point within time threshold
+            max_time = ship_times_minutes[i] + time_threshold
+            j_max = np.searchsorted(ship_times_minutes, max_time, side='right')
+            j_max = min(j_max, n)
+            
+            # Also limit j_max to next gap split to avoid crossing trajectory boundaries
+            next_gap_splits = gap_splits[gap_splits > i]
+            if len(next_gap_splits) > 0:
+                j_max = min(j_max, next_gap_splits[0])
+            
+            # Quick check: can we even reach the time threshold?
+            if j_max <= i + 1:
+                i += 1
+                continue
+            
+            # Start checking from first point that satisfies time threshold
+            j_start = i + 1
+            while j_start < j_max and (ship_times_minutes[j_start] - ship_times_minutes[i]) < time_threshold:
+                j_start += 1
+            
+            if j_start >= j_max:
+                i += 1
+                continue
+            
+            # Now check if period [i:j] is stationary for j >= j_start
+            j = j_start
+            stationary_found = False
+            
+            # Check if all SOG values in range are low (vectorized)
+            if np.all(low_speed_mask[i:j+1]):
+                # Extend as far as possible while maintaining low speed
+                while j < j_max - 1 and low_speed_mask[j+1]:
                     j += 1
+                stationary_end = j + 1
+                stationary_found = True
             else:
-                # No stationary period found, assign to current trajectory
-                if df.loc[curr_idx, 'Trajectory'] == -1:
-                    df.loc[curr_idx, 'Trajectory'] = current_traj_id
+                # SOG check failed, try position variance
+                lats = ship_lats[i:j+1]
+                lons = ship_lons[i:j+1]
+                pos_variance = calculate_position_variance(lats, lons)
+                
+                if pos_variance < position_threshold:
+                    # Extend the stationary period
+                    while j < j_max - 1:
+                        lats = ship_lats[i:j+2]
+                        lons = ship_lons[i:j+2]
+                        pos_variance = calculate_position_variance(lats, lons)
+                        
+                        if pos_variance < position_threshold:
+                            j += 1
+                        else:
+                            break
+                    stationary_end = j + 1
+                    stationary_found = True
+            
+            if stationary_found:
+                # Mark stationary points for exclusion
+                trajectories[ship_indices[i:stationary_end]] = -2
+                current_traj_id += 1
+                i = stationary_end
+            else:
                 i += 1
         
         current_traj_id += 1
     
-    # Remove stationary points (marked as -2)
+    # Assign trajectory column and remove stationary points
+    df['Trajectory'] = trajectories
     df = df[df['Trajectory'] != -2].reset_index(drop=True)
     
-    # Filter by minimum requirements
+    # Filter by minimum requirements - vectorized approach
+    traj_ids = df['Trajectory'].values
+    unique_trajs = df['Trajectory'].unique()
+    
+    # Pre-compute trajectory sizes
+    traj_counts = df.groupby('Trajectory').size()
+    size_valid = traj_counts >= min_points
+    
+    # Vectorized distance calculation
     valid_trajs = []
-    for traj_id in df['Trajectory'].unique():
-        traj_data = df[df['Trajectory'] == traj_id]
-        if len(traj_data) < min_points:
-            continue
-        
-        start = traj_data.iloc[0][['Latitude', 'Longitude']].values
-        end = traj_data.iloc[-1][['Latitude', 'Longitude']].values
-        distance = haversine_distance(start[0], start[1], end[0], end[1])
-        
-        if distance >= min_segment_distance:
+    first_indices = df.groupby('Trajectory').head(1).index
+    last_indices = df.groupby('Trajectory').tail(1).index
+    
+    first_coords = df.loc[first_indices, ['Latitude', 'Longitude']].values
+    last_coords = df.loc[last_indices, ['Latitude', 'Longitude']].values
+    
+    distances = haversine_distance(
+        first_coords[:, 0], first_coords[:, 1],
+        last_coords[:, 0], last_coords[:, 1]
+    )
+    
+    for idx, traj_id in enumerate(unique_trajs):
+        if size_valid[traj_id] and distances[idx] >= min_segment_distance:
             valid_trajs.append(traj_id)
     
     df_result = df[df['Trajectory'].isin(valid_trajs)].copy()
