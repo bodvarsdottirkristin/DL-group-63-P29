@@ -4,9 +4,11 @@ import torch.nn.functional as F
 import argparse
 import numpy as np
 from src.datasets.AISDataSet import get_dataloaders
-from src.models.VRAE import VRAE
+from src.models.VRAE import VRAE, vae_loss
 from src.models.HDBSCAN import cluster_latent_space
 from src.preprocessing.trajectory_builder import build_trajectories_from_parquet
+from src.visualization.visualize_hdbscan import plot_hdbscan_latent
+
 
 def train_epoch(model, dataloader, optimizer, device, beta=1.0):
     model.train()
@@ -15,8 +17,16 @@ def train_epoch(model, dataloader, optimizer, device, beta=1.0):
 
     for x in dataloader:
         x = x.to(device)  # (B, T, D)
-        out = model(x)
-        loss, recon, kld = VRAE.loss_function(x, out["x_hat"], out["mu"], out["logvar"], beta=beta)
+        batch_size, seq_len, _ = x.shape
+        lengths = torch.full(
+            (batch_size,),
+            seq_len,
+            dtype=torch.long,
+            device=device,
+        )
+
+        reconstruction, mu, logvar = model(x, lengths)
+        loss, recon, kld = vae_loss(reconstruction, x, mu, logvar, beta=beta)
 
         optimizer.zero_grad()
         loss.backward()
@@ -34,6 +44,7 @@ def train_epoch(model, dataloader, optimizer, device, beta=1.0):
     )
 
 
+
 def eval_epoch(model, dataloader, device, beta=1.0):
     model.eval()
     total_loss = total_recon = total_kld = 0.0
@@ -42,8 +53,16 @@ def eval_epoch(model, dataloader, device, beta=1.0):
     with torch.no_grad():
         for x in dataloader:
             x = x.to(device)
-            out = model(x)
-            loss, recon, kld = VRAE.loss_function(x, out["x_hat"], out["mu"], out["logvar"], beta=beta)
+            batch_size, seq_len, _ = x.shape
+            lengths = torch.full(
+                (batch_size,),
+                seq_len,
+                dtype=torch.long,
+                device=device,
+            )
+
+            reconstruction, mu, logvar = model(x, lengths)
+            loss, recon, kld = vae_loss(reconstruction, x, mu, logvar, beta=beta)
 
             total_loss += loss.item()
             total_recon += recon.item()
@@ -56,14 +75,20 @@ def eval_epoch(model, dataloader, device, beta=1.0):
         total_kld / n_batches,
     )
 
-
 def collect_latent_mus(model, dataloader, device):
     model.eval()
     mus = []
     with torch.no_grad():
         for x in dataloader:
             x = x.to(device)
-            mu = model.encode_mu(x)  # (B, latent_dim)
+            batch_size, seq_len, _ = x.shape
+            lengths = torch.full(
+                (batch_size,),
+                seq_len,
+                dtype=torch.long,
+                device=device,
+            )
+            mu, logvar = model.encode(x, lengths)  # (B, latent_dim)
             mus.append(mu.cpu().numpy())
     return np.concatenate(mus, axis=0)  # (N, latent_dim)
 
@@ -84,7 +109,19 @@ def main():
     parser.add_argument("--beta", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--save_path", type=str, default="vrae_checkpoint.pt")
+    parser.add_argument(
+    "--mmsi",
+    type=str,
+    default=None,
+    help="Comma-separated list of MMSIs to include (for debugging / subset).",
+)
     args = parser.parse_args()
+
+    if args.mmsi is not None:
+      # e.g. "--mmsi 123456789,987654321,111222333"
+      mmsi_whitelist = [m.strip() for m in args.mmsi.split(",") if m.strip()]
+    else:
+        mmsi_whitelist = None
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -98,6 +135,7 @@ def main():
         parquet_path=args.data_path,
         seq_len=args.seq_len,
         step=1,
+        mmsi_whitelist=mmsi_whitelist,
     )
     print(f"Trajectories shape: {trajectories.shape}")  # (N, T, D)
 
@@ -116,8 +154,6 @@ def main():
         input_dim=input_dim,
         hidden_dim=args.hidden_dim,
         latent_dim=args.latent_dim,
-        num_layers=args.num_layers,
-        bidirectional=args.bidirectional,
     ).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -157,6 +193,8 @@ def main():
 
     n_clusters = (unique != -1).sum()
     print(f"Number of clusters (excluding noise): {n_clusters}")
+
+    plot_hdbscan_latent(mus, labels, out_path="plots/hdbscan_latent.png")
 
 
 if __name__ == "__main__":

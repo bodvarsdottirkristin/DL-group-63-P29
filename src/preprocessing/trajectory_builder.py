@@ -194,6 +194,7 @@ def build_trajectories_from_parquet(
     parquet_path: str,
     seq_len: int = 64,
     step: int = 1,
+    mmsi_whitelist = None,
 ) -> torch.Tensor:
     """
     Load AIS parquet, segment into trajectories, create sliding-window
@@ -210,17 +211,33 @@ def build_trajectories_from_parquet(
     if not np.issubdtype(df["Timestamp"].dtype, np.datetime64):
         df["Timestamp"] = pd.to_datetime(df["Timestamp"])
 
-    # Segment into moving trajectories if not already segmented
-    if "Trajectory" not in df.columns:
-        df = segment_trajectories(df)
 
-    df = df.sort_values(["MMSI", "Trajectory", "Timestamp"])
+     # 🔹 Filter to a subset of MMSIs, if requested
+    if mmsi_whitelist is not None:
+        # Make sure types match (MMSI often stored as string in your pipeline)
+        df["MMSI"] = df["MMSI"].astype(str)
+        mmsi_whitelist = [str(m) for m in mmsi_whitelist]
+        df = df[df["MMSI"].isin(mmsi_whitelist)]
+        print(f"Filtered to {len(mmsi_whitelist)} MMSIs, remaining rows: {len(df)}")
+
+    # Decide which column defines trajectories
+    if "Segment" in df.columns:
+     
+        print("Using existing 'Segment' column as trajectory id.")
+
+    group_cols = ["MMSI", "Segment"]
+    df = df.sort_values(group_cols + ["Timestamp"])
+
+    print("Total rows after filtering & sorting:", len(df))
+    print("Number of trajectory groups:", df.groupby(group_cols).ngroups)
 
     sequences = []
+    lengths = []
 
-    for (mmsi, traj_id), g in df.groupby(["MMSI", "Trajectory"]):
+    for keys, g in df.groupby(group_cols):
         feats = trajectory_to_features(g)  # (T, 5)
         T = feats.shape[0]
+        lengths.append(T)
         if T < seq_len:
             continue
 
@@ -230,7 +247,16 @@ def build_trajectories_from_parquet(
             sequences.append(window)
 
     if len(sequences) == 0:
-        raise ValueError("No sequences produced. Check seq_len / segment params.")
+        print("DEBUG: No sequences created.")
+        if lengths:
+            print("  Num trajectories:", len(lengths))
+            print("  Min length:", min(lengths))
+            print("  Max length:", max(lengths))
+            print("  seq_len:", seq_len)
+        else:
+            print("  No trajectories at all after filtering (maybe MMSI filter too strict?).")
+        raise ValueError("No sequences produced. Check seq_len / MMSI filter / data path.")
 
     trajectories = np.stack(sequences, axis=0)  # (N, seq_len, 5)
+    print("Built trajectories tensor with shape:", trajectories.shape)
     return torch.from_numpy(trajectories).float()
