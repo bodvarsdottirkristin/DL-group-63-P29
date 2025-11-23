@@ -9,15 +9,7 @@ from src.models.vrae import VRAE, vae_loss
 from src.models.hdbscan import cluster_latent_space
 from src.preprocessing.trajectory_builder import build_trajectories_from_parquet
 from src.visualization.visualize_hdbscan import plot_hdbscan_latent
-
-def set_seed(seed: int):
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    # Optional: for strict reproducibility (slower, but very deterministic)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+from src.utils.seed import set_seed
 
 def train_one_epoch(model, dataloader, optimizer, device, beta: float = 1.0):
     """

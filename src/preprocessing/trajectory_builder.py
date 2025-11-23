@@ -5,7 +5,7 @@ import torch
 R_EARTH = 6371000.0  # meters
 
 # ----------------------------------------------------------------------
-#  Segmentation code (your logic)
+#  Segmentation code
 # ----------------------------------------------------------------------
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -212,7 +212,7 @@ def build_trajectories_from_parquet(
         df["Timestamp"] = pd.to_datetime(df["Timestamp"])
 
 
-     # 🔹 Filter to a subset of MMSIs, if requested
+     # Filter to a subset of MMSIs, if requested
     if mmsi_whitelist is not None:
         # Make sure types match (MMSI often stored as string in your pipeline)
         df["MMSI"] = df["MMSI"].astype(str)
