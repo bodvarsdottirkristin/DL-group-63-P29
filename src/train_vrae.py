@@ -1,8 +1,6 @@
 import argparse
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 from src.datasets.AISDataSet import get_dataloaders
 from src.models.vrae import VRAE, vae_loss
