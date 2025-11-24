@@ -24,3 +24,4 @@ def cluster_latent_space(mus):
     labels = clusterer.fit_predict(mus_scaled)
 
     return labels, clusterer, scaler
+

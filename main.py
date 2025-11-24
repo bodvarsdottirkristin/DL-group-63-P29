@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-from data_processing.regularize_tracks import regularize_segment
-
+#from src.datacleaning import fn, fn_get_dk_ports
+from src.datasets.window_maker import make_past_future_windows
 
 
 
@@ -25,9 +25,13 @@ def main():
     in_path = "data/aisdk/raw/aisdk-2025-08-29.csv"
     out_path =  "data/aisdk/interim/initial_clean"
 
-    regularize_segment()
-    
+    #fn()
+    #regularize_segment()
 
+    make_past_future_windows(
+        past_min=30,future_min=30,
+        input_path="data/aisdk/processed/aisdk_2025", 
+        output_path="data/aisdk/processed/windows_30_30")
 
 
 
