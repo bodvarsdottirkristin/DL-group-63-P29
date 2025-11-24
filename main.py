@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-from src.datacleaning import fn, fn_get_dk_ports
 from data_processing.regularize_tracks import regularize_segment
 
 
@@ -26,7 +25,6 @@ def main():
     in_path = "data/aisdk/raw/aisdk-2025-08-29.csv"
     out_path =  "data/aisdk/interim/initial_clean"
 
-    fn()
     regularize_segment()
     
 
