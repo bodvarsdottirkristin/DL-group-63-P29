@@ -165,7 +165,6 @@ def process_zip(zip_path: str,
 
     # 5) Add geospatial UTM coordinates and drop Lat/Lon
     df = to_utm(df)
-    df = df.drop(columns=["Latitude", "Longitude"])
 
     print("Final columns:", df.columns.tolist())
     print(f"Rows after filtering: {len(df)}")
