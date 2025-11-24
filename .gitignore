@@ -32,3 +32,5 @@ checkpoints/
 # Plots
 plots/
 
+# data
+src/data_processing/data
