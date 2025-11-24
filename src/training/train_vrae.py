@@ -3,9 +3,9 @@ import numpy as np
 import torch
 
 from src.datasets.AISDataSet import get_dataloaders
-from src.models.vrae import VRAE, vae_loss
-from src.models.hdbscan import cluster_latent_space
-from src.preprocessing.trajectory_builder import build_trajectories_from_parquet
+from src.models.VRAE import VRAE, vae_loss
+from src.models.HDBSCAN import cluster_latent_space
+from src.data_processing.trajectory_builder import build_trajectories_from_parquet
 from src.visualization.visualize_hdbscan import plot_hdbscan_latent
 from src.utils.seed import set_seed
 
