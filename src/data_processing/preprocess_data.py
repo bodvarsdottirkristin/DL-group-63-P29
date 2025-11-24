@@ -163,9 +163,8 @@ def process_zip(zip_path: str,
     # 4) Unit conversion
     df = convert_sog_to_ms(df, col="SOG")
 
-    # 5) Add geospatial UTM coordinates and drop Lat/Lon
+    # 5) Add geospatial UTM coordinates
     df = to_utm(df)
-    df = df.drop(columns=["Latitude", "Longitude"])
 
     print("Final columns:", df.columns.tolist())
     print(f"Rows after filtering: {len(df)}")
