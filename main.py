@@ -3,7 +3,7 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 from src.datacleaning import fn, fn_get_dk_ports
-from src.regularize_tracks import regularize_segment
+from data_processing.regularize_tracks import regularize_segment
 
 
 

@@ -94,12 +94,12 @@ def resample_segment(g):
     out = pd.DataFrame(index=new_index)
 
     # Interpolation on an angle
-    for col in ["COG", "Heading"]:
+    for col in ["COG"]:
         if col in g.columns:
             out[col] = interpolate_angle(g[col].astype(float), new_index)
     
     # Interpolate for continuous data
-    for col in ["Latitude", "Longitude", "SOG"]:
+    for col in ["UTM_x", "UTM_y", "SOG"]:
         if col in g.columns:
             out[col] = interpolate_continuous_pchip(g[col].astype(float), new_index)
 
