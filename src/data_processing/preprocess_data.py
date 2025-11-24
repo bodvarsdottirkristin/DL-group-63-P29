@@ -1,6 +1,11 @@
 import pandas as pd
 import pyarrow
 import pyarrow.parquet
+import importlib
+import trajectory_segmentation
+importlib.reload(trajectory_segmentation)
+from coord_to_utm import to_utm
+from trajectory_segmentation import segment_trajectories
 
 # -------------------------------------------------------------------
 # Config / constants
@@ -10,7 +15,6 @@ AIS_DTYPES = {
     "MMSI": "object",
     "SOG": float,
     "COG": float,
-    "Heading": float,
     "Longitude": float,
     "Latitude": float,
     "# Timestamp": "object",
@@ -101,49 +105,6 @@ def drop_duplicate_messages(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def make_track_filter(min_length: int = 256,
-                      min_sog: float = 1.0,
-                      max_sog: float = 50.0,
-                      min_duration_sec: int = 60 * 60):
-    """Return a predicate function to filter tracks/segments."""
-
-    def track_filter(g: pd.DataFrame) -> bool:
-        len_filt = len(g) > min_length
-        sog_filt = min_sog <= g["SOG"].max() <= max_sog
-        time_span = (g["Timestamp"].max() - g["Timestamp"].min()).total_seconds()
-        time_filt = time_span >= min_duration_sec
-        return len_filt and sog_filt and time_filt
-
-    return track_filter
-
-
-def filter_tracks_by_mmsi(df: pd.DataFrame,
-                          track_filter) -> pd.DataFrame:
-    """Filter full tracks at MMSI level using provided predicate."""
-    df = df.groupby("MMSI").filter(track_filter)
-    print("Filtered tracks at MMSI level.")
-    return df
-
-
-def add_segments_by_time_gap(df: pd.DataFrame,
-                             gap_minutes: int = 15) -> pd.DataFrame:
-    """Add 'Segment' column: new segment when gap >= gap_minutes."""
-    df = df.sort_values(["MMSI", "Timestamp"])
-    df["Segment"] = df.groupby("MMSI")["Timestamp"].transform(
-        lambda x: (x.diff().dt.total_seconds().fillna(0) >= gap_minutes * 60).cumsum()
-    )
-    print(f"Segmented tracks using time gap >= {gap_minutes} minutes.")
-    return df
-
-
-def filter_segments(df: pd.DataFrame,
-                    track_filter) -> pd.DataFrame:
-    """Filter segments using the same track_filter predicate."""
-    df = df.groupby(["MMSI", "Segment"]).filter(track_filter)
-    print("Filtered segments at (MMSI, Segment) level.")
-    return df.reset_index(drop=True)
-
-
 def convert_sog_to_ms(df: pd.DataFrame,
                       col: str = "SOG") -> pd.DataFrame:
     """Convert SOG from knots to m/s."""
@@ -186,6 +147,7 @@ def process_zip(zip_path: str,
     Returns the final cleaned DataFrame.
     """
     print(f"\n=== Processing {zip_path} ===")
+    print(f"Output path: {out_path}")
 
     # 1) Load
     df = read_zip_to_df(zip_path)
@@ -196,28 +158,20 @@ def process_zip(zip_path: str,
     df = filter_by_mobile_class(df)
     df = clean_mmsi(df)
     df = parse_timestamp(df)
-    df = drop_duplicate_messages(df)
-
-    # 3) Track & segment logic
-    track_filter = make_track_filter(
-        min_length=256,
-        min_sog=1.0,
-        max_sog=50.0,
-        min_duration_sec=60 * 60,
-    )
-
-    df = filter_tracks_by_mmsi(df, track_filter)
-    df = add_segments_by_time_gap(df, gap_minutes=gap_minutes)
-    df = filter_segments(df, track_filter)
+  
 
     # 4) Unit conversion
     df = convert_sog_to_ms(df, col="SOG")
+
+    # 5) Add geospatial UTM coordinates and drop Lat/Lon
+    df = to_utm(df)
+    df = df.drop(columns=["Latitude", "Longitude"])
 
     print("Final columns:", df.columns.tolist())
     print(f"Rows after filtering: {len(df)}")
 
     # 5) Save
-    save_parquet_partitioned(df, out_path=out_path, partition_cols=["MMSI", "Segment"])
+    save_parquet_partitioned(df, out_path=out_path, partition_cols=["MMSI"])
     print(f"=== Done for {zip_path} ===\n")
 
     return df
