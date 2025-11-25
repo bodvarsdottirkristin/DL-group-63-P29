@@ -126,8 +126,11 @@ def load_parquet_files(input_path='data/aisdk/processed/windows_30_30', cluster_
     df['past_window'] = df["past_window"].apply(lambda w: np.vstack(w))
     df["future_window"] = df["future_window"].apply(lambda w: np.vstack(w))
 
+    past = np.stack(df['past_window'])
+    future = np.stack(df['future_window'])
 
-    return df["past_window"], df["future_window"], df["cluster_id"]
+
+    return past, future, df["cluster_id"]
 
 
 
