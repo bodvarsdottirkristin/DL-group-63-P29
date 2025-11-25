@@ -3,6 +3,7 @@ import pyarrow
 import pyarrow.parquet
 import os
 import random
+import numpy as np
 
 
 def assign_cluster_ids_to_segments(df_segment):
@@ -97,3 +98,45 @@ def make_past_future_windows(
     print(f"   → Processed segments: {processed_segments}")
     print(f"   → Total windows generated: {total_windows:,}")
     print(f"   → Output stored under: {output_path}\n")
+
+
+def load_parquet_files(input_path='data/aisdk/processed/windows_30_30', cluster_id=None):
+
+    if cluster_id is not None:
+        # Load only one cluster
+        cluster_dir = os.path.join(input_path, f"cluster_id={cluster_id}")
+        df = pd.read_parquet(cluster_dir)
+
+    else:
+        df_list = []
+        for cluster_dir in os.listdir(input_path):
+
+            full_path = os.path.join(input_path, cluster_dir)
+
+            # Only load directories like: cluster_id=0, cluster_id=2, ...
+            if not (os.path.isdir(full_path) and cluster_dir.startswith("cluster_id=")):
+                continue
+
+            print(f"→ loading {full_path}")
+            df_cid = pd.read_parquet(full_path)
+            df_list.append(df_cid)
+
+        df = pd.concat(df_list, ignore_index=True)
+
+    df['past_window'] = df["past_window"].apply(lambda w: np.vstack(w))
+    df["future_window"] = df["future_window"].apply(lambda w: np.vstack(w))
+
+
+    return df["past_window"], df["future_window"], df["cluster_id"]
+
+
+
+    
+
+
+
+    
+
+
+    #return past_window, future_window, cluster_id
+    
