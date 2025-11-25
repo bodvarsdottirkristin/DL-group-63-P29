@@ -2,6 +2,8 @@
 import torch
 import torch.nn as nn
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class RNNModel(nn.Module):  
     # TODO: 
     #   what is the size of the input/output?

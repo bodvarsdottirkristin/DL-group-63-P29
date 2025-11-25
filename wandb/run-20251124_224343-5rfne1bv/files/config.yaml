@@ -1,0 +1,37 @@
+_wandb:
+    value:
+        cli_version: 0.22.3
+        e:
+            aetlrgx9apvvb798lbaee7iu6t6gbl28:
+                codePath: main.py
+                codePathLocal: main.py
+                email: helgamariam@gmail.com
+                executable: /Users/helgamariamagnusdottir/anaconda3/bin/python
+                git:
+                    commit: 54f6b90a551b9375ca33119a79fc180bc1bb022c
+                    remote: https://github.com/bodvarsdottirkristin/DL-group-63-P29.git
+                host: Mac
+                os: macOS-15.6.1-arm64-arm-64bit
+                program: /Users/helgamariamagnusdottir/Documents/dtu/deep_learning/DL-group-63-P29/main.py
+                python: CPython 3.11.8
+                root: /Users/helgamariamagnusdottir/Documents/dtu/deep_learning/DL-group-63-P29
+                startedAt: "2025-11-24T21:43:43.958897Z"
+                writerId: aetlrgx9apvvb798lbaee7iu6t6gbl28
+        m: []
+        python_version: 3.11.8
+        t:
+            "3":
+                - 2
+                - 16
+            "4": 3.11.8
+            "5": 0.22.3
+            "12": 0.22.3
+            "13": darwin-arm64
+architecture:
+    value: CNN
+dataset:
+    value: CIFAR-100
+epochs:
+    value: 10
+learning_rate:
+    value: 0.02

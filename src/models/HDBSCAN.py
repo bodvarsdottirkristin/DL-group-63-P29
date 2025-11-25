@@ -1,6 +1,8 @@
 from sklearn.preprocessing import StandardScaler
 import hdbscan
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Clustering of latent representation of trajectories
 def cluster_latent_space(mus):
     """

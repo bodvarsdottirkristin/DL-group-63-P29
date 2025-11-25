@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
 import torch.nn.functional as F
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class VRAE(nn.Module):
 
     def __init__(self, input_dim=5, hidden_dim=50, latent_dim=20, num_layers_encoder=3, num_layers_decoder=2):

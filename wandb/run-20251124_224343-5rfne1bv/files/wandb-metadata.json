@@ -1,0 +1,17 @@
+{
+  "os": "macOS-15.6.1-arm64-arm-64bit",
+  "python": "CPython 3.11.8",
+  "startedAt": "2025-11-24T21:43:43.958897Z",
+  "program": "/Users/helgamariamagnusdottir/Documents/dtu/deep_learning/DL-group-63-P29/main.py",
+  "codePath": "main.py",
+  "codePathLocal": "main.py",
+  "git": {
+    "remote": "https://github.com/bodvarsdottirkristin/DL-group-63-P29.git",
+    "commit": "54f6b90a551b9375ca33119a79fc180bc1bb022c"
+  },
+  "email": "helgamariam@gmail.com",
+  "root": "/Users/helgamariamagnusdottir/Documents/dtu/deep_learning/DL-group-63-P29",
+  "host": "Mac",
+  "executable": "/Users/helgamariamagnusdottir/anaconda3/bin/python",
+  "writerId": "aetlrgx9apvvb798lbaee7iu6t6gbl28"
+}

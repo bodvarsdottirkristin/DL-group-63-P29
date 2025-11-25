@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-from scipy.interpolate import PchipInterpolator
+import random
+import wandb
 
 #from src.datacleaning import fn, fn_get_dk_ports
 from src.datasets.window_maker import make_past_future_windows
@@ -8,33 +9,44 @@ from src.datasets.window_maker import make_past_future_windows
 
 
 def main():
-    # in_path = "data/aisdk/raw/aisdk-2025-08-29.csv"
-    # out_path = "data/aisdk/interim/aisdk-2025-08-29"
 
-    # df = pd.read_csv("data/aisdk/processed/processed_ais_data_to_look_at.csv")
-    # #df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+    # make_past_future_windows(
+    #     past_min=30,future_min=30,
+    #     input_path="data/aisdk/processed/aisdk_2025", 
+    #     output_path="data/aisdk/processed/windows_30_30")
+    
+    # Start a new wandb run to track this script.
+    # run = wandb.init(
+    #     # Set the wandb entity where your project will be logged (generally your team name).
+    #     entity="ais-maritime-data",
+    #     # Set the wandb project where this run will be logged.
+    #     project="ais-maritime-prediction",
+    #     # Track hyperparameters and run metadata.
+    #     config={
+    #         "learning_rate": 0.02,
+    #         "architecture": "CNN",
+    #         "dataset": "CIFAR-100",
+    #         "epochs": 10,
+    #     },
+    # )
 
-    # df_new = df.groupby(["MMSI", "Segment"]).apply(resample_segment)
+    # Simulate training.
+    # epochs = 10
+    # offset = random.random() / 5
+    # for epoch in range(2, epochs):
+    #     acc = 1 - 2**-epoch - random.random() / epoch - offset
+    #     loss = 2**-epoch + random.random() / epoch + offset
 
-    # #df = resample_segment()
+    #     # Log metrics to wandb.
+    #     run.log({"acc": acc, "loss": loss})
 
-    # print(df_new.head())
-    # print(df.head())
-    # #fn(in_path, out_path)  
+    # # Finish the run and upload any remaining data.
+    # run.finish()
 
-    in_path = "data/aisdk/raw/aisdk-2025-08-29.csv"
-    out_path =  "data/aisdk/interim/initial_clean"
+    df = pd.read_parquet("data/aisdk/processed/windows_30_30/cluster_id=0")
+    print(df.head())
 
-    #fn()
-    #regularize_segment()
-
-    make_past_future_windows(
-        past_min=30,future_min=30,
-        input_path="data/aisdk/processed/aisdk_2025", 
-        output_path="data/aisdk/processed/windows_30_30")
-
-
-
+    print(df.info())
 
 if __name__ == "__main__":
     main()
