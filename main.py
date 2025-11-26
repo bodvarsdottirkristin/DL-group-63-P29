@@ -4,7 +4,9 @@ import random
 import wandb
 
 #from src.datacleaning import fn, fn_get_dk_ports
-from src.datasets.window_maker import make_past_future_windows
+from src.datasets.window_maker import make_past_future_windows, load_parquet_files
+from src.models.classification_rnn import ClassificationRNN
+from src.training.train_classification_rnn import *
 
 
 
@@ -43,12 +45,18 @@ def main():
     # # Finish the run and upload any remaining data.
     # run.finish()
 
-    df = pd.read_parquet("data/aisdk/processed/windows_30_30/cluster_id=0")
-    print(df.head())
+    # df = pd.read_parquet("data/aisdk/processed/windows_30_30/cluster_id=0")
+    # print(df.head())
 
-    print(df.info())
+    # print(df.info())
+    #load_windows_from_parquet("data/aisdk/processed/windows_30_30/cluster_id=0")
+
+    X, Y, C = load_parquet_files()
+
+    run_classification_train_rnn(X, C, False)
+
+    
 
 if __name__ == "__main__":
     main()
     
-# TODO: do we need to filter on ships going from/to ports in dk

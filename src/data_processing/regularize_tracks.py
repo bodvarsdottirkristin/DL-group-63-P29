@@ -105,9 +105,6 @@ def resample_segment(g):
 
     return out
 
-    # TODO:
-        # Are there any missing values that we need to be aware of?
-
 
     # TIMESTAMP:    Fixed 1min intervals
     # MMSI:         Constant fill

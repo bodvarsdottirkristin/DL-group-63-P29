@@ -111,7 +111,7 @@ class TrajectoryPredictor(nn.Module):
                 and torch.rand(1).item() < teacher_forcing_ratio
             ):
                 # Use ground truth at current step t
-                next_input = targets[:, t, 🙂  # (batch, output_dim)
+                next_input = targets[:, t, :]  # (batch, output_dim)
             else:
                 # Use model's own prediction
                 next_input = prediction.squeeze(1)  # (batch, output_dim)
