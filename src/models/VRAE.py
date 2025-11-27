@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 
 class VRAE(nn.Module):
@@ -99,6 +99,7 @@ def vae_loss(reconstruction, target, mu, logvar, beta=1.0):
 
     recon_loss = F.mse_loss(reconstruction, target, reduction='mean')
 
+    # TO DO: Should we also normalise by latent_dim?
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_loss = kl_loss / target.size(0)  # Normalize by batch
 
