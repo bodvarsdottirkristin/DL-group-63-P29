@@ -2,7 +2,7 @@ import random
 import numpy as np
 import torch
 
-def set_seed(seed=0):
+def set_seed(seed=42):
     """Set seed for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)

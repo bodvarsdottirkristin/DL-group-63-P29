@@ -9,175 +9,229 @@ import yaml
 import wandb
 from dotenv import load_dotenv
 from pathlib import Path
-from collections import defaultdict
 from tqdm import tqdm
 
-from src.models.trajectory_predictor import TrajectoryPredictor, trajectory_loss
+from src.models.trajectory_predictor import TrajectoryPredictor, trajectory_loss, DEVICE
 from src.utils.seed import set_seed
+from src.utils.config import flatten_config
 
+# path to .env file (one level up)
 dotenv_path = Path(__file__).parents[1] / '.env'
 load_dotenv(dotenv_path=dotenv_path)
 
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 wandb.login(key=WANDB_API_KEY)
 
+# TODO: 
+#       Normalize the data??
 
+def _train_cluster_predictor(X_cluster: np.ndarray, y_cluster: np.ndarray, cid: int, cfg: dict):
 
-def _train_cluster_predictor(past: np.ndarray,future: np.ndarray,cfg: dict,cid: int):
     """
-    Train TrajectoryPredictor on one cluster’s windows.
-    past:   (N, 30, 5)
-    future: (N, 30, 5)
-    """
-    # --- Train/Val split ---
-    idx_train, idx_val = train_test_split(
-        np.arange(len(past)),
-        test_size=0.2,
-        random_state=42
-    )
-    past_train   = torch.tensor(past[idx_train],   dtype=torch.float32)
-    future_train = torch.tensor(future[idx_train], dtype=torch.float32)
-    past_val     = torch.tensor(past[idx_val],     dtype=torch.float32)
-    future_val   = torch.tensor(future[idx_val],   dtype=torch.float32)
+    Train an RNN that predicts a future AIS sequence based on a past
+    AIS sequence (e.g., 30×5). Handles train/val split, dataloaders,
+    training loop, validation loop, and wandb logging.
 
+    Inputs:
+        X_cluster  — np.array (N_cluster, seq_len, features)
+        y_cluster  — np.array (N_cluster,) cluster labels
+        cfg        — dict of training hyperparameters
+
+    Returns:
+        model — trained RNN 
+        best_val_mse — lowest validation loss
+    """
+
+    X_train, X_val, y_train, y_val  = train_test_split(X_cluster, y_cluster, test_size=cfg["val_split"], random_state=cfg["seed"])
+    
+    # NORMALIZE CODE FROM KRISTIN
+    # train_all = np.concatenate([past_train_np, future_train_np], axis=1)  # (N_train, 60, 5)
+
+    # mean = train_all.mean(axis=(0, 1), keepdims=True) 
+    # std  = train_all.std(axis=(0, 1), keepdims=True)
+
+    # past_train_norm   = (past_train_np   - mean) / std
+    # future_train_norm = (future_train_np - mean) / std
+    # past_val_norm     = (past_val_np     - mean) / std
+    # future_val_norm   = (future_val_np   - mean) / std
+
+
+    X_train_t   = torch.tensor(X_train, dtype=torch.float32)
+    X_val_t     = torch.tensor(X_val  , dtype=torch.float32)
+
+    y_train_t   = torch.tensor(y_train, dtype=torch.float32)
+    y_val_t     = torch.tensor(y_val  , dtype=torch.float32)
+    
     train_loader = DataLoader(
-        TensorDataset(past_train, future_train),
+        TensorDataset(X_train_t, y_train_t),
         batch_size=cfg["batch_size"],
         shuffle=True,
-        drop_last=True,
+        drop_last=False,    # because all sequences are of the same size
     )
 
     val_loader = DataLoader(
-        TensorDataset(past_val, future_val),
+        TensorDataset(X_val_t, y_val_t),
         batch_size=cfg["batch_size"],
         shuffle=False,
     )
 
-    # --- Model ---
+    # --- Model, optimizer, loss ---
+    n_features = X_train.shape[-1]
+
     model = TrajectoryPredictor(
-        input_dim=5,
-        output_dim=5,
-        hidden_dim=20,
-        num_layers_encoder=1,
-        num_layers_decoder=1
-    ).to(cfg["device"])
+        input_dim=n_features,
+        output_dim=n_features,
+        hidden_dim=cfg["hidden_size"],
+        num_layers_encoder=cfg["num_layers_encoder"],
+        num_layers_decoder=cfg["num_layers_decoder"]
+    ).to(DEVICE)
 
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=0.01,
-        weight_decay=1e-5,
-    )
+    opt = torch.optim.Adam(model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
 
-    print(f"🚀 Training TrajectoryPredictor on cluster {cid}, n={len(past)}")
+    print(f"Training started on device: {DEVICE}...")
+    print(f"Cluster ID: {cid}, Cluster Size: {X_train_t.shape[0]}")
+    
     best_val_mse = float("inf")
 
-    for epoch in range(1, 10 + 1):
+    # ------ Training loop ------ 
+    train_samples = 0
+    for epoch in range(1, cfg["epochs"] + 1):
 
-        # --- TRAIN ---
         model.train()
         total = 0.0
 
-        for xb_past, xb_future in tqdm(
-            train_loader,
-            desc=f"Cluster {cid} Epoch {epoch}/{cfg['epochs']}"
-        ):
-            xb_past   = xb_past.to(cfg["device"])
-            xb_future = xb_future.to(cfg["device"])
+        for xb, yb in tqdm(train_loader, desc=f"Cluster {cid} Epoch {epoch}/{cfg['epochs']}"):
+            xb = xb.to(DEVICE)
+            yb = yb.to(DEVICE)
 
-            optimizer.zero_grad()
 
-            preds = model(
-                xb_past,
-                target_length=xb_future.size(1),
-                targets=xb_future,
-                teacher_forcing_ratio=cfg["teacher_forcing"]
-            )
-
-            loss = trajectory_loss(preds, xb_future)
+            opt.zero_grad()
+            yb_pred = model(xb, target_length=yb.size(1), targets=yb, teacher_forcing_ratio=cfg["teacher_forcing"])
+            
+            loss = trajectory_loss(yb_pred, yb)
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=cfg["max_norm"])
+            opt.step()
+            total += loss.item() * xb.size(0)
+            train_samples += xb.size(0)
 
-            total += loss.item() * xb_past.size(0)
 
-        train_mse = total / len(train_loader.dataset)
+        train_mse = total / len(X_train_t)
+
 
         # --- VALIDATION ---
         model.eval()
+        val_total = 0.0
+        val_samples = 0
         with torch.no_grad():
-            xv_past   = past_val.to(cfg["device"])
-            xv_future = future_val.to(cfg["device"])
-            preds = model(
-                xv_past,
-                target_length=xv_future.size(1),
-                targets=None,
-                teacher_forcing_ratio=0.0
-            )
-            val_mse = F.mse_loss(preds, xv_future, reduction="mean").item()
+            for xb, yb in val_loader:
+                xb = xb.to(DEVICE)
+                yb = yb.to(DEVICE)
 
-        best_val_mse = min(best_val_mse, val_mse)
+                yb_pred = model(
+                    xb,
+                    target_length=yb.size(1),
+                    targets=None,
+                    teacher_forcing_ratio=0.0
+                )
 
-        print(f"Epoch {epoch}/{cfg['epochs']} "
-              f"- Train MSE: {train_mse:.6f} | Val MSE: {val_mse:.6f}")
+                loss = trajectory_loss(yb_pred, yb)
+                bs = xb.size(0)
 
-        wandb.log({
-            "epoch": epoch,
-            "cluster_id": cid,
-            "train_mse": train_mse,
-            "val_mse": val_mse,
-        })
+                val_total += loss * bs
+                val_samples += bs
+
+        val_mse = val_total / val_samples
+
+        best_val_mse = min(best_val_mse,val_mse)
+
+        print(
+            f"Epoch {epoch}/{cfg['epochs']} - "
+            f"Train MSE : {train_mse:.6f} - "
+            f"Val MSE   : {val_mse:.6f}"
+        )
+
+        # ------- WandB logging -------
+        if wandb.run is not None:
+            wandb.log({
+                "epoch": epoch,
+                "cluster_id": cid,
+                "train_mse": train_mse,
+                "val_mse": val_mse,
+                "cluster_id": cid,
+                "n_samples": X_cluster.shape[0],
+                "n_train": X_train.shape[0],
+                "n_val": X_val.shape[0],
+                "best_val_mse": best_val_mse,
+                "total_epochs": cfg["epochs"],
+                "batch_size": cfg["batch_size"],
+            })
 
     return model, best_val_mse
 
-def run_predictor_cluster(past, future, labels, sweep=False):
+def run_predictor_cluster(X: np.ndarray, y: np.ndarray, cluster_labels: np.ndarray, cid: int, sweep=False):
     """
-    Train predictor for ONE cluster, using wandb (same pattern as AE training).
-    """
+    Top-level training wrapper. Loads config, starts wandb,
+    calls the training function, saves the model, and logs results.
 
-    # Load config
-    with open("./predictor_cluster_config.yaml") as file:
+    Inputs:
+        X — all past windows                (N, seq_len, features)
+        y — all future windows              (N, seq_len, features) 
+        cluster_labels - all cluster lables (N,)
+        cid - specified cluster
+        sweep — enable wandb hyperparameter sweep mode
+
+    Output:
+        None (saves model + logs wandb stats)
+    """
+    # Load config with hyperparameters
+    with open("src/configs/trajectory_predictor.yaml") as file:
         CONFIG = yaml.safe_load(file)
 
     if sweep:
-        wandb.init(project="trajectory-predictor", entity="ais-prediction")
+        wandb.init(project="trajectory-predictor", entity="ais-maritime-data")
         cfg = dict(wandb.config)
     else:
-        cfg_flat = {k: v["value"] if isinstance(v, dict) else v 
-                    for k, v in CONFIG["parameters"].items()}
-        wandb.init(project="trajectory-predictor", entity="ais-prediction", config=cfg_flat)
-        cfg = cfg_flat
+        conf = flatten_config(CONFIG)
+        wandb.init(project="trajectory-predictor", entity="ais-maritime-data", config=conf)
+        cfg = conf
+        
+    # Set seeds
+    set_seed()
+    
+    # Filter on cluster
+    X_cluster = X[cluster_labels == cid]
+    y_cluster = y[cluster_labels == cid]
 
-    cid = cfg["cluster_id"]
-
-    # Set seed and device
-    set_seed(cfg["seed"])
-    cfg["device"] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Filter only this cluster’s windows
-    Xp = past[labels == cid]
-    Xf = future[labels == cid]
-    print(f"Training cluster {cid}: n={len(Xp)}")
+    print(f"Training cluster {cid}: n={X_cluster.shape[0]}")
 
     # wandb naming
-    import datetime
-    time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    wandb.run.name = f"pred_cluster_{cid}_{time_str}"
+    if wandb.run:
+        import datetime
+        # timestamp readable
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        wandb.run.name = f"pred_cluster_{cid}_{time_str}"
 
+    # info logs
     wandb.log({
         "cluster_id": cid,
-        "cluster_size": len(Xp),
+        "cluster_size": X_cluster.shape[0],
     })
 
-    # Train
-    model, best_val = _train_cluster_predictor(Xp, Xf, cfg, cid)
+    # Call function to train the model
+    model, best_val = _train_cluster_predictor(X_cluster, y_cluster, cid, cfg)
 
-    # Save model
+    # Save the trained model
     os.makedirs(cfg["out_dir"], exist_ok=True)
     model_path = os.path.join(cfg["out_dir"], f"pred_cluster_{cid}.pt")
     torch.save(model.state_dict(), model_path)
     wandb.save(model_path)
 
-    wandb.log({"best_val_mse": best_val})
+    # Sweep summary (single scalar per run)
+    wandb.log({
+        "best_val_mse": best_val
+    })
     wandb.run.summary["best_val_mse"] = best_val
 
     print(f"Model saved to {model_path}")
