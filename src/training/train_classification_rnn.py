@@ -1,18 +1,14 @@
 import numpy as np
-
 import torch
 import torch.nn as nn
-
 import wandb
 import os
 import yaml
-
 from tqdm import tqdm
 from pathlib import Path
 from dotenv import load_dotenv
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
-
 from src.models.classification_rnn import ClassificationRNN, DEVICE
 from src.utils.seed import set_seed
 from src.utils.config import flatten_config
@@ -21,13 +17,13 @@ from src.utils.config import flatten_config
 # TODO: 
 #   Implement weight decay?
 #   Implement train / test!!
-#   Tengja WandB 
 
 dotenv_path = Path(__file__).parents[1] / '.env'
 load_dotenv(dotenv_path=dotenv_path)
 
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 wandb.login(key=WANDB_API_KEY)
+
 
 def train_classification_rnn(X: np.ndarray, y: np.ndarray, cfg):
     """
@@ -46,7 +42,8 @@ def train_classification_rnn(X: np.ndarray, y: np.ndarray, cfg):
     """
        
     # ------ Train / val split ------
-    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=cfg["val_split"],random_state=cfg["seed"],stratify=y) 
+    
+    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=cfg["val_split"],random_state=cfg["seed"]) 
     y_train, y_val = np.asarray(y_train).astype(int), np.asarray(y_val).astype(int)
 
 

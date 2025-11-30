@@ -5,31 +5,37 @@ import os
 import random
 import numpy as np
 
+PARQUET_FILE_FINAL = os.path.join("data", "aisdk", "processed")
 
-def assign_cluster_ids_to_segments(df_segment):
+def _get_cluster_id_for_segment(df_segment):
     """Placeholder random cluster assignment."""
     return random.randint(0, 9)
 
-
 def make_past_future_windows(
-        past_min=30, 
-        future_min=30, 
-        input_path="data/aisdk/processed/aisdk_2025", 
+        past_min=30,
+        future_min=30,
+        input_path="data/aisdk/processed/train.parquet",
         output_path="data/aisdk/processed/windows_30_30"):
     """
     Splits trajectory data into past and future windows,
     and saves per-segment parquet files partitioned by cluster_id.
+
+    Assumes:
+      - input_path points to a parquet file (or partitioned dataset) that
+        is already standardized and sorted by MMSI, Trajectory, Timestamp.
+      - 'Trajectory' identifies each trajectory segment.
+      - Optionally, a 'cluster_id' column may already exist (e.g. from HDBSCAN).
+        If not, a random placeholder cluster is assigned.
     """
 
     print("Loading input dataset...")
     df = pd.read_parquet(input_path)
     print(f"   → Loaded {len(df):,} rows.")
 
-    df = df.sort_values(["MMSI", "Trajectory", "Timestamp"])
-    print(f"   → Sorted by MMSI, Trajectory, Timestamp.\n")
+    # If you're NOT sure it's sorted, uncomment the next line:
+    df = df.sort_values(["Trajectory", "Timestamp"])
 
     feature_cols = ['UTM_x', 'UTM_y', 'SOG', 'v_east', 'v_north']
-
     group_cols = ['MMSI', 'Trajectory']
     grouped = df.groupby(group_cols)
 
@@ -55,8 +61,8 @@ def make_past_future_windows(
 
         feats = g[feature_cols].to_numpy(dtype=float)
 
-        # Assign cluster
-        cluster_id = assign_cluster_ids_to_segments(g)
+        # Use existing cluster_id if present, otherwise random placeholder
+        cluster_id = _get_cluster_id_for_segment(g)
 
         # Number of windows
         num_windows = T - window_len_total + 1
@@ -97,7 +103,7 @@ def make_past_future_windows(
     print("\nDONE!")
     print(f"   → Processed segments: {processed_segments}")
     print(f"   → Total windows generated: {total_windows:,}")
-    print(f"   → Output stored under: {output_path}\n")
+    print(f"   → Output stored under: {output_path}\n")    
 
 
 def load_parquet_files(input_path='data/aisdk/processed/windows_30_30', cluster_id=None):
