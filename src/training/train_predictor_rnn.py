@@ -42,8 +42,14 @@ def _train_cluster_predictor(X_cluster: np.ndarray, y_cluster: np.ndarray, cid: 
         best_val_mse — lowest validation loss
     """
 
+    # Traejectories
     X_train, X_val, y_train, y_val  = train_test_split(X_cluster, y_cluster, test_size=cfg["val_split"], random_state=cfg["seed"])
     
+    # Normalize
+
+    # Windowmaker
+    X_train_w, X_val, y_train, y_val = window_maker(X_train, X_val, y_train, y_val)
+
     # NORMALIZE CODE FROM KRISTIN
     # train_all = np.concatenate([past_train_np, future_train_np], axis=1)  # (N_train, 60, 5)
 
