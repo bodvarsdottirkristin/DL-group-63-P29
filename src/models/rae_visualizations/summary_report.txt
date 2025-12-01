@@ -1,0 +1,10 @@
+RAE LATENT SPACE ANALYSIS SUMMARY
+======================================================================
+
+Samples: 463
+Latent dimensions: 12
+Latent std: 0.6670
+Mean MSE: 0.168746
+Mean pairwise distance: 2.9927
+Active dimensions: 12/12
+Health score: 4/5
