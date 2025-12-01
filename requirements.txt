@@ -18,4 +18,8 @@ torchsummary
 hdbscan
 
 requests
-
+    
+utm
+plotly
+pyproj
+nbformat

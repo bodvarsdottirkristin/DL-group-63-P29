@@ -65,11 +65,13 @@ def segment_trajectories(df,
                          time_threshold=30,  # 30 minutes
                          time_gap_threshold=30,  # 30 minutes - split on large gaps (transponder issues)
                          min_segment_distance=1000,  # 1 km
-                         min_points=10):
+                         min_points=10,
+                         max_speed_mps=30.87):  # ~60 knots in m/s (fast military vessels)
     """
     Segment ship AIS data into trajectories, splitting when:
     1. Ships stop moving: (SOG < 1 knot) OR (position variance < 50m) for > 30 min
     2. Large time gaps (>30 min) between consecutive points (transponder issues)
+    3. Unrealistic speed jumps between consecutive points (implied speed > max_speed)
     
     Optimized with vectorized operations and efficient detection.
     """
@@ -100,6 +102,23 @@ def segment_trajectories(df,
         # Pre-identify time gap splits (vectorized) - where gaps exceed threshold
         gap_splits = np.where(time_gaps >= time_gap_threshold)[0] + 1  # +1 because diff reduces size by 1
         
+        # Pre-identify unrealistic speed jumps (vectorized) - efficient check
+        speed_jump_splits = []
+        if len(ship_lats) > 1:
+            # Calculate distances between consecutive points (vectorized)
+            distances = haversine_distance(
+                ship_lats[:-1], ship_lons[:-1],
+                ship_lats[1:], ship_lons[1:]
+            )
+            # Calculate time differences in seconds
+            time_diffs = time_gaps * 60  # convert minutes to seconds
+            # Avoid division by zero
+            time_diffs = np.maximum(time_diffs, 0.1)
+            # Calculate implied speeds in m/s
+            implied_speeds = distances / time_diffs
+            # Find where speed exceeds maximum realistic speed
+            speed_jump_splits = np.where(implied_speeds > max_speed_mps)[0] + 1
+        
         # Pre-identify low-speed points for faster checks
         low_speed_mask = ship_sogs < sog_threshold
         
@@ -108,11 +127,20 @@ def segment_trajectories(df,
         i = 1
         n = len(ship_indices)
         gap_split_set = set(gap_splits)  # Convert to set for O(1) lookup
+        speed_jump_set = set(speed_jump_splits)  # Convert to set for O(1) lookup
         
         while i < n:
             # Check for large time gap first (cheap O(1) operation)
             if i in gap_split_set:
                 # Large time gap detected - start new trajectory
+                current_traj_id += 1
+                trajectories[ship_indices[i]] = current_traj_id
+                i += 1
+                continue
+            
+            # Check for unrealistic speed jump (cheap O(1) operation)
+            if i in speed_jump_set:
+                # Unrealistic jump detected - start new trajectory
                 current_traj_id += 1
                 trajectories[ship_indices[i]] = current_traj_id
                 i += 1
@@ -127,10 +155,13 @@ def segment_trajectories(df,
             j_max = np.searchsorted(ship_times_minutes, max_time, side='right')
             j_max = min(j_max, n)
             
-            # Also limit j_max to next gap split to avoid crossing trajectory boundaries
+            # Also limit j_max to next gap split or speed jump to avoid crossing trajectory boundaries
             next_gap_splits = gap_splits[gap_splits > i]
             if len(next_gap_splits) > 0:
                 j_max = min(j_max, next_gap_splits[0])
+            next_speed_jumps = speed_jump_splits[speed_jump_splits > i]
+            if len(next_speed_jumps) > 0:
+                j_max = min(j_max, next_speed_jumps[0])
             
             # Quick check: can we even reach the time threshold?
             if j_max <= i + 1:
