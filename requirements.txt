@@ -1,5 +1,6 @@
 numpy
 scipy
+seaborn
 scikit-learn
 matplotlib
 pandas
@@ -23,3 +24,4 @@ utm
 plotly
 pyproj
 nbformat
+pyyaml
