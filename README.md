@@ -1,10 +1,40 @@
 # DL-group-63-P29
-Repo for the Increasing Maritime Domain Awareness using spatio-temporal sequential data project
+# Trajectory Prediction of Cargo Vessels Around Denmark
 
-Predicting future trajectories of cargo vessels
+This repository contains the code for our project in **02456 Deep Learning (DTU, Fall 2025)**.
+The goal is to predict short-term trajectories of cargo ships operating in Danish waters using AIS data and deep learning.
+
+We follow a pipeline inspired by Murray & Perera (2021) that combines:
+
+- Recurrent Autoencoders (RAE) for trajectory representation learning
+- Density-based clustering (HDBSCAN) in the laten space
+- A GRU-based calssifier to predict behavioural clusters
+- Cluster-conditioned GRU models for short-term trajectory forecasting
+
+## Project overview
+
+Maritime AIS (Automatic Identification System) data provides irregular, noisy observations of vessel positions and motion. 
+Our aim is to:
+
+-> Predict the next **30 minutes** of a vessel's trajectory given the past **30 minutes** of AIS observations.
+
+To make this feasable, we:
+
+1. Preprocess raw AIS messages into clean, uniform trajectories
+2. Learn latent representations with a Recurrent Autoencoder
+3. Cluster trajectories in latent space to discover behavioural groups
+4. Train:
+   - a classifier that predicts the future cluster from the past segment
+   - and a cluster-specific GRU predictor for the future trajectory
+  
+This repository container the full pipeline implementation in **PyTorch** 
 
 
-# info on the data
+## Repository structure
+[Structure of the repo here]
+
+
+# info on the original AIS dataset
 Columns in *.csv file                   Format
 ----------------------------------------------------------------------------------------------------------------------------------------------------
 1.    Timestamp                         Timestamp from the AIS basestation, format: 31/12/2015 23:59:59 
