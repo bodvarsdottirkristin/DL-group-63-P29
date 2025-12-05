@@ -8,10 +8,13 @@ __pycache__/
 
 # Envs & tools
 .venv/
+.env
 .mypy_cache/
 .pytest_cache/
 .ipynb_checkpoints/
 *.egg-info/
+wandb/
+checkpoints/
 
 # Data & artifacts
 data/aisdk/
@@ -32,5 +35,5 @@ checkpoints/
 # Plots
 plots/
 
-# data
-src/data_processing/data
+# Other 
+hm_analysis.ipynb
