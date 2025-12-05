@@ -26,7 +26,7 @@ logs/
 checkpoints/
 *.pt
 *.pth
-*.parquet
+# *.parquet
 
 # Editors/OS
 .DS_Store
