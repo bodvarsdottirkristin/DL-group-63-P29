@@ -107,7 +107,6 @@ class RecurrentAutoencoder(nn.Module):
         return reconstruction, z
 
 
-
 def pad_trajectories(batch):
     lengths = torch.tensor([len(traj) for traj in batch])
     padded = pad_sequence(batch, batch_first=True, padding_value=0.0)
