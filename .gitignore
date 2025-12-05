@@ -14,15 +14,23 @@ __pycache__/
 *.egg-info/
 
 # Data & artifacts
-data/aisdk/
+data/aisdk/clustered_train/
+data/aisdk/clustered_val/
+data/aisdk/interim/
+data/aisdk/processed/
+data/aisdk/raw/
+data/aisdk/windows/
+data/aisdk/test/
+data/aisdk/train/
+data/aisdk/val/
 data/ais_data/
 data/interim/
 data/processed/
 outputs/
 logs/
 checkpoints/
-*.pt
-*.pth
+# *.pt
+# *.pth
 # *.parquet
 
 # Editors/OS
