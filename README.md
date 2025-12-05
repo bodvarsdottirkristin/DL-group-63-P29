@@ -37,10 +37,23 @@ To make this feasable, we:
   
 This repository container the full pipeline implementation in **PyTorch** 
 
-
 ## Repository structure
-[Structure of the repo here]
-
+DL-group-63-P29/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── project.ipynb <- Main ipynb to produce the results of the report
+├── data/
+│   └── gitignored raw/processed data 
+└── src/
+    ├── data_processing/
+    │   └── data_pipeline.ipynb
+    └── models/
+        ├── train_RAE.ipynb
+        ├── train_HDBSCAN.ipynb
+        ├── train_classifier.ipynb
+        ├── train_prediction_rnn.ipynb
+        └── final_testing.ipynb
 
 # info on the original AIS dataset
 Columns in *.csv file                   Format
