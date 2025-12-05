@@ -38,11 +38,11 @@ To make this feasable, we:
 This repository container the full pipeline implementation in **PyTorch** 
 
 ## Repository structure
-DL-group-63-P29/
+```
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
-├── project.ipynb <- Main ipynb to produce the results of the report
+├── project.ipynb <- Main .ipynb to produce the results of the report
 ├── data/
 │   └── gitignored raw/processed data 
 └── src/
@@ -54,6 +54,7 @@ DL-group-63-P29/
         ├── train_classifier.ipynb
         ├── train_prediction_rnn.ipynb
         └── final_testing.ipynb
+```
 
 # info on the original AIS dataset
 Columns in *.csv file                   Format
