@@ -11,13 +11,16 @@ We follow a pipeline inspired by Murray & Perera (2021) that combines:
 - A GRU-based calssifier to predict behavioural clusters
 - Cluster-conditioned GRU models for short-term trajectory forecasting
 
-To replicate our results, notebooks should be run in the following order:
+Our pipeline was run in the following order:
 1. src/data_processing/data_pipeline.ipynb
 2. src/models/train_RAE.ipynb
 3. src/models/train_HDBSCAN.ipynb
 4. src/models/train_classifier.ipynb
 5. src/models/train_prediction_rnn.ipynb
 6. src/models/final_testing.ipynb
+
+**project.ipynb recreates the main results of our report**
+
 
 ## Project overview
 
