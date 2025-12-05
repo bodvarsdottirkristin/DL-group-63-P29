@@ -25,7 +25,7 @@ import importlib
 import json
 import itertools
 
-def visualize_rae_latent_space(model, data_loader, device, save_dir='rae_visualizations', max_samples=5000):
+def visualize_rae_latent_space(model, data_loader, device, save_dir='plots/rae_visualizations', max_samples=5000):
     """
     Comprehensive latent space visualization for RAE clustering analysis.
     
