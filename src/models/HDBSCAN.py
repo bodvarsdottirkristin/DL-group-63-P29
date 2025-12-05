@@ -16,8 +16,8 @@ def cluster_latent_space(mus):
     mus_scaled = scaler.fit_transform(mus)
 
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=30,   # TODO: Tune
-        min_samples=None,      # TODO: Tune
+        min_cluster_size=30,
+        min_samples=None,
         metric="euclidean",
         cluster_selection_method="eom",
     )
